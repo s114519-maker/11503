@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>明雄哥音檔播放器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .player-container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 350px;
+            text-align: center;
+        }
+
+        /* 封面圖片 */
+        .cover-image {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            background-color: #ddd;
+        }
+
+        /* 歌曲資訊 */
+        .track-info {
+            margin: 20px 0;
+        }
+
+        .track-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 進度條區塊 */
+        .progress-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            flex-grow: 1;
+            width: 70%;
+            cursor: pointer;
+            accent-color: #4A90E2;
+        }
+
+        .time {
+            font-size: 0.85rem;
+            color: #666;
+            width: 45px;
+        }
+
+        /* 控制按鈕 */
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            background-color: #4A90E2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 6px rgba(74, 144, 226, 0.2);
+            user-select: none;
+        }
+
+        .btn:hover {
+            background-color: #357ABD;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-toggle {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background-color: #2ECC71; /* 播放狀態為綠色 */
+            box-shadow: 0 4px 6px rgba(46, 204, 113, 0.2);
+        }
+
+        .btn-toggle.playing {
+            background-color: #E74C3C; /* 暫停狀態為紅色 */
+            box-shadow: 0 4px 6px rgba(231, 76, 60, 0.2);
+        }
+
+        /* 集數選擇框框 */
+        .playlist {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        .episode-box {
+            border: 2px solid #4A90E2;
+            color: #4A90E2;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            flex: 1;
+            user-select: none;
+        }
+
+        .episode-box:hover {
+            background-color: #eef5fc;
+        }
+
+        .episode-box.active {
+            background-color: #4A90E2;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="player-container">
+        <img src="明雄哥111.png" alt="播放器封面" class="cover-image" onerror="this.src='https://via.placeholder.com/350x250?text=明雄哥111.png+Missing'">
+
+        <div class="track-info">
+            <div class="track-title" id="track-title">請選擇集數</div>
+        </div>
+
+        <div class="progress-container">
+            <span class="time" id="current-time">00:00</span>
+            <input type="range" class="progress-bar" id="progress-bar" min="0" max="100" value="0">
+            <span class="time" id="duration">00:00</span>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="btn-prev">上集</button>
+            <button class="btn btn-toggle" id="btn-toggle">播放</button>
+            <button class="btn" id="btn-next">下集</button>
+        </div>
+
+        <div class="playlist">
+            <div class="episode-box" id="ep1" onclick="switchEpisode(0)">第一集</div>
+            <div class="episode-box" id="ep2" onclick="switchEpisode(1)">第二集</div>
+        </div>
+    </div>
+
+    <audio id="audio-player" preload="auto"></audio>
+
+    <script>
+        // 音檔資料清單
+        const playlist = [
+            { title: "第一集：明雄擎天崗", src: "明雄擎天崗.mp3" },
+            { title: "第二集：雍的錄音", src: "雍的錄音 .m4a" }
+        ];
+
+        let currentIndex = 0; 
+        let isPlaying = false; // 新增明確的播放狀態變數
+
+        // 取得 DOM 元素
+        const audio = document.getElementById('audio-player');
+        const trackTitle = document.getElementById('track-title');
+        const progressBar = document.getElementById('progress-bar');
+        const currentTimeEl = document.getElementById('current-time');
+        const durationEl = document.getElementById('duration');
+        const btnToggle = document.getElementById('btn-toggle');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const ep1Box = document.getElementById('ep1');
+        const ep2Box = document.getElementById('ep2');
+
+        // 更新按鈕 UI 狀態的函式
+        function updateButtonUI() {
+            if (isPlaying) {
+                btnToggle.textContent = "暫停";
+                btnToggle.classList.add('playing');
+            } else {
+                btnToggle.textContent = "播放";
+                btnToggle.classList.remove('playing');
+            }
+        }
+
+        // 初始化/載入音軌
+        function loadTrack(index) {
+            currentIndex = index;
+            
+            audio.pause(); 
+            isPlaying = false; // 重設狀態為未播放
+            
+            audio.src = playlist[index].src;
+            audio.load(); 
+            
+            trackTitle.textContent = playlist[index].title;
+            
+            // 更新下方框框亮燈狀態
+            if (index === 0) {
+                ep1Box.classList.add('active');
+                ep2Box.classList.remove('active');
+            } else {
+                ep2Box.classList.add('active');
+                ep1Box.classList.remove('active');
+            }
+            
+            // 重設進度條
+            progressBar.value = 0;
+            currentTimeEl.textContent = "00:00";
+            durationEl.textContent = "00:00";
+            
+            updateButtonUI();
+        }
+
+        // 【修正核心】使用獨立的 isPlaying 變數控制播放與暫停，徹底排除無法暫停、初次載入無法播放的問題
+        function playAudio() {
+            audio.play().then(() => {
+                isPlaying = true;
+                updateButtonUI();
+            }).catch(error => {
+                console.log("播放被封鎖或失敗：", error);
+                alert("播放失敗！請確認網頁與音檔是否放在同一個資料夾，且檔名完全一致（注意空格）。");
+            });
+        }
+
+        function pauseAudio() {
+            audio.pause();
+            isPlaying = false;
+            updateButtonUI();
+        }
+
+        btnToggle.addEventListener('click', () => {
+            if (isPlaying) {
+                pauseAudio();
+            } else {
+                playAudio();
+            }
+        });
+
+        // 點擊下方框框切換集數
+        function switchEpisode(index) {
+            loadTrack(index);
+            playAudio();
+        }
+
+        // 上一集
+        btnPrev.addEventListener('click', () => {
+            let nextIndex = currentIndex - 1;
+            if (nextIndex < 0) nextIndex = playlist.length - 1;
+            switchEpisode(nextIndex);
+        });
+
+        // 下一集
+        btnNext.addEventListener('click', () => {
+            let nextIndex = currentIndex + 1;
+            if (nextIndex >= playlist.length) nextIndex = 0;
+            switchEpisode(nextIndex);
+        });
+
+        // 自動連播下一集
+        audio.addEventListener('ended', () => {
+            let nextIndex = currentIndex + 1;
+            if (nextIndex >= playlist.length) nextIndex = 0;
+            switchEpisode(nextIndex);
+        });
+
+        // 監聽 HTML5 音訊本身的事件，確保狀態與 UI 同步（處理使用者拖動或耳機按鈕等外部事件）
+        audio.addEventListener('play', () => {
+            isPlaying = true;
+            updateButtonUI();
+        });
+
+        audio.addEventListener('pause', () => {
+            isPlaying = false;
+            updateButtonUI();
+        });
+
+        // 定時更新進度條與時間數值
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+                const progressPercent = (audio.currentTime / audio.duration) * 100;
+                progressBar.value = progressPercent;
+                currentTimeEl.textContent = formatTime(audio.currentTime);
+                durationEl.textContent = formatTime(audio.duration);
+            }
+        });
+
+        // 拖動進度條改變音樂進度
+        progressBar.addEventListener('input', () => {
+            if (audio.duration) {
+                const newTime = (progressBar.value / 100) * audio.duration;
+                audio.currentTime = newTime;
+            }
+        });
+
+        // 格式化時間（秒 -> 分:秒）
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "00:00";
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        // 網頁開起來時自動載入第一集
+        window.addEventListener('DOMContentLoaded', () => {
+            loadTrack(0);
+        });
+    </script>
+</body>
+</html>
